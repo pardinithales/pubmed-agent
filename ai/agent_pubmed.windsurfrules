@@ -1,0 +1,104 @@
+# Agente de Busca Otimizada para PubMed usando LLMs
+
+## Visão Geral do Agente
+
+Este agente foi projetado para auxiliar pesquisadores clínicos a encontrar artigos científicos relevantes no PubMed de forma eficiente, usando Modelos de Linguagem (LLMs) para gerar e refinar consultas. 
+
+O fluxo inicia com uma pergunta clínica estruturada no formato **PICOTT** (População, Intervenção, Comparação, Outcome, Tipo de estudo, Tempo de seguimento) fornecida pelo usuário. A partir desse objetivo, o agente constrói iterativamente a melhor query possível para o PubMed, refinando termos e filtros para maximizar a relevância dos resultados e minimizar o ruído (artigos irrelevantes).
+
+> **Nota**: Nesta primeira versão, o foco é exclusivamente obter a melhor consulta PubMed (string de busca) e apresentá-la ao usuário, sem recuperar ou resumir os artigos completos.
+
+## Processo do Agente (Etapas Principais)
+
+### 1. Transformação do Objetivo em Consulta Inicial ([tiab])
+
+O usuário insere seu objetivo em linguagem natural seguindo o formato PICOTT. A primeira LLM (usando a API DeepSeek R1) interpreta essa descrição e gera uma consulta PubMed estruturada, incluindo apenas campos de título/resumo ([tiab]) para cada termo relevante. Nesta etapa:
+
+- São identificados os termos-chave correspondentes a cada elemento PICOTT (ex: população, intervenção, outcome, etc.).
+- A LLM combina esses termos em uma query utilizando operadores booleanos (AND/OR) apropriados e restringe cada termo a [tiab] (título ou resumo) para focar a busca no conteúdo principal do artigo.
+- Termos MeSH não são usados nesta fase, para evitar restrições excessivas ou dependência de indexação. A ideia é capturar termos livres usados pelos autores nos títulos/resumos.
+
+**Exemplo**: Para uma pergunta PICOTT sobre "Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O) em ensaios clínicos randomizados (T tipo de estudo) com seguimento de 6 meses (T tempo)", a LLM geraria algo como:
+
+```
+("diabetes tipo 2"[tiab] AND "metformina"[tiab] AND "HbA1c"[tiab] AND "randomized controlled trial"[tiab] AND "6 months"[tiab])
+```
+
+Essa query inicial ainda pode ser ampla, mas já foca nos conceitos principais.
+
+### 2. Roteamento da Consulta (Decisão: API vs. Web Scraping)
+
+A query estruturada gerada é então enviada para uma LLM roteadora (ex.: GPT-4o Mini). Este módulo decide como executar a busca:
+
+- **Via API do PubMed**: Se a consulta for simples o suficiente ou se espera-se que a API retorne resultados estruturados facilmente (número de artigos, IDs, resumos, etc.), o agente utiliza a API oficial do PubMed (NCBI E-utilities) para realizar a busca. Essa API aceita a query estruturada e retorna dados como contagem de resultados e lista de identificadores de artigos (PMIDs).
+- **Via Web Scraping (Firecrawl)**: Se a consulta for muito complexa, contiver caracteres especiais, ou se o agente avaliar que um scraping direto traria benefícios (por exemplo, acessar a página web do PubMed para extrair detalhes não fornecidos pela API), ele aciona uma ferramenta de raspagem eficiente como Firecrawl.
+
+Essa decisão é automatizada: o GPT-4o Mini avalia o contexto da query e possivelmente o número estimado de resultados, então escolhe a rota ótima em termos de rapidez e confiabilidade.
+
+### 3. Execução da Busca e Obtenção de Resultados
+
+Uma vez decidido o método, o agente executa a busca no PubMed e obtém os resultados iniciais:
+
+- **Recuperação de Metadados**: O agente coleta informações como:
+  - Número total de artigos encontrados para a query atual
+  - Uma amostra dos primeiros resultados (títulos, tipos de publicação, ano, etc.)
+  
+Esses resultados não são ainda apresentados ao usuário, mas são armazenados internamente para avaliação. A partir dos metadados, o agente obtém indicadores de relevância:
+  - Quantidade de resultados obtidos
+  - Presença de termos indicativos de tipo de estudo nos títulos
+  - Diversidade ou especificidade dos resultados
+
+### 4. Verificação de Qualidade dos Resultados
+
+Nesta etapa, o agente aplica critérios de qualidade para avaliar se a consulta precisa ser refinada:
+
+- **Número de artigos entre 100 e 500**: 
+  - < 100 resultados: query pode estar muito específica (risco de perder estudos relevantes)
+  - > 500 resultados: query pode estar muito genérica (dificultando a triagem)
+  - 100-500 resultados: ponto ideal para garantir volume manejável com boa abrangência
+
+- **Prioridade para estudos primários**:
+  - Verificação da proporção de artigos do tipo estudo primário (RCTs, estudos de coorte, caso-controle)
+  - Busca por palavras-chave como "Randomized Controlled Trial", "Cohort", "Case-Control" nos títulos/resumos
+
+- **Preferência secundária por revisões sistemáticas**:
+  - Checar se há revisões sistemáticas relevantes dentre os resultados
+
+- **Detecção de artigos irrelevantes**:
+  - Identificação de resultados claramente fora do escopo usando heurísticas ou LLM
+
+### 5. Refinamento Iterativo da Consulta
+
+Com base nos sinais da etapa anterior, o agente aprimora a query e repete a busca, em um ciclo até atingir uma consulta ideal:
+
+- **Ajuste de Termos**: Adicionar ou substituir termos por sinônimos ou variações
+- **Combinação de Operadores**: Usar operadores booleanos mais complexos ou parênteses
+
+Exemplo:
+```
+("diabetes mellitus tipo 2"[tiab] OR "DM2"[tiab]) AND ("metformina"[tiab] OR "biguanida"[tiab]) AND "HbA1c"[tiab] AND "randomized"[tiab]
+```
+
+- **Remoção de Palavras Desnecessárias**: Eliminar termos genéricos ou que não contribuem para filtrar resultados
+- **Balanceamento de Especificidade**: Verificar novamente o número de resultados e relevância a cada iteração
+- **Limite de Iterações**: Para eficiência, definir um limite (3-5 iterações)
+
+### 6. Exibição da Melhor Consulta
+
+Após as iterações, o agente seleciona a melhor query final desenvolvida e a apresenta ao usuário:
+
+- A query é exibida em formato de texto, pronta para ser utilizada no PubMed
+- O usuário pode copiá-la ou usar um botão que a execute diretamente no PubMed
+
+## Instruções para Implementação da LLM
+
+Como LLM responsável por este agente, você deve:
+
+1. **Analisar cuidadosamente** a pergunta PICOTT do usuário, identificando todos os elementos relevantes
+2. **Transformar** conceitos clínicos em termos de busca apropriados para PubMed
+3. **Construir** queries estruturadas usando operadores booleanos e qualificadores [tiab]
+4. **Avaliar** a qualidade dos resultados obtidos usando os critérios estabelecidos
+5. **Refinar iterativamente** a consulta até atingir o equilíbrio entre abrangência e precisão
+6. **Apresentar** a melhor consulta final ao usuário de forma clara e utilizável
+
+Lembre-se que seu objetivo é auxiliar pesquisadores clínicos a encontrar a melhor evidência possível para suas perguntas, economizando tempo e aumentando a qualidade da busca bibliográfica.

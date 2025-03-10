@@ -1,0 +1,27 @@
+Always create a env with necessary api keys
+
+# Chaves de API de exemplo (substitua com suas próprias chaves)
+LLAMA_CLOUD_API_KEY=your_llama_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+SUPABASE_URL=your_supabase_url_here
+SUPABASE_KEY=your_supabase_key_here
+
+# OpenRouter API Key (para modelos de texto e visão)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# OpenAI API Key (para TTS)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# ElevenLabs API Key (para TTS avançado)
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+
+# Anthropic API Key (opcional)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# DEFAULT MAX OUTPUT TOKENS
+DEFAULT_MAX_OUTPUT_TOKENS=4000
+
+# DeepSeek API Key (opcional)
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+GEMINI_API_KEY=your_gemini_api_key_here

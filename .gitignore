@@ -1,0 +1,65 @@
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ambientes virtuais
+venv/
+env/
+ENV/
+.env
+
+# Arquivos de variáveis de ambiente e configurações sensíveis
+.env
+*.env
+config.ini
+credentials.json
+secrets.toml
+.streamlit/secrets.toml
+
+# Cache Streamlit
+.streamlit/
+
+# Arquivos de IDE e editores
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Arquivos temporários
+*.tmp
+temp/
+tmp/
+
+# Arquivos de saída e dados
+*.csv
+*.json
+*.pkl
+*.h5
+*.sqlite
+*.db
+
+# Outros arquivos específicos do projeto que possam conter dados sensíveis
+# Adicione conforme necessário

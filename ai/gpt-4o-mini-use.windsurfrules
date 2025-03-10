@@ -1,0 +1,32 @@
+# Python
+
+curl
+To use the OpenAI API in Python, you can use the official OpenAI SDK for Python. Get started by installing the SDK using pip:
+
+Install the OpenAI SDK with pip
+pip install openai
+With the OpenAI SDK installed, create a file called example.py and copy one of the following examples into it:
+
+
+Generate text
+
+Generate an image
+
+Create vector embeddings
+Create a human-like response to a prompt
+from openai import OpenAI
+client = OpenAI()
+
+completion = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {
+            "role": "user",
+            "content": "Write a haiku about recursion in programming."
+        }
+    ]
+)
+
+print(completion.choices[0].message)
+Execute the code with python example.py. In a few moments, you should see the output of your API reque
