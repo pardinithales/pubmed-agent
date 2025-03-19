@@ -86,20 +86,21 @@ with st.expander("Como funciona?"):
 # Formulário para entrada do usuário
 st.subheader("Formulário de Consulta")
 
-with st.form("picott_form"):
-    picott_text = st.text_area(
-        "Digite sua pergunta clínica no formato PICOTT:",
-        height=100,
-        placeholder="Ex: Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O) em ensaios clínicos randomizados (T tipo de estudo) com seguimento de 6 meses (T tempo)"
-    )
-    
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        max_iterations = st.slider("Número máximo de iterações", 1, 5, 3)
-    with col2:
-        use_offline = st.checkbox("Usar modo offline (se API indisponível)", value=False)
-    
-    submit_button = st.form_submit_button("Gerar Consulta Otimizada")
+# Separar a entrada de dados do formulário para debugging
+picott_text = st.text_area(
+    "Digite sua pergunta clínica no formato PICOTT:",
+    height=100,
+    placeholder="Ex: Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O) em ensaios clínicos randomizados (T tipo de estudo) com seguimento de 6 meses (T tempo)"
+)
+
+col1, col2 = st.columns([1, 1])
+with col1:
+    max_iterations = st.slider("Número máximo de iterações", 1, 5, 3)
+with col2:
+    use_offline = st.checkbox("Usar modo offline (se API indisponível)", value=False)
+
+# Botão simples fora do formulário
+submit_button = st.button("Gerar Consulta Otimizada", type="primary", use_container_width=True)
 
 # Função para consultar a API
 async def query_api(text, max_iterations=3):
@@ -148,7 +149,7 @@ def simulate_query(text):
         "simulation": True
     }
 
-# Processar quando o formulário for enviado
+# Processar quando o botão for clicado
 if submit_button and picott_text:
     with st.spinner("Gerando consulta otimizada para PubMed..."):
         result = None
