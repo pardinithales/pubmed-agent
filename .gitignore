@@ -34,9 +34,6 @@ credentials.json
 secrets.toml
 .streamlit/secrets.toml
 
-# Cache Streamlit
-.streamlit/
-
 # Arquivos de IDE e editores
 .idea/
 .vscode/
