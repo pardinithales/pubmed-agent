@@ -83,27 +83,53 @@ Para implantar a aplicação no Streamlit Cloud, siga estas etapas:
 
 Observação: A aplicação verificará automaticamente se as chaves de API obrigatórias estão configuradas e exibirá uma mensagem de erro caso estejam faltando.
 
-## Como Executar
+## Execução
 
-1. Instale as dependências:
-```
-pip install -r requirements.txt
-```
+### Método 1: Inicialização Unificada (Recomendado)
 
-2. Configure as variáveis de ambiente (crie um arquivo .env):
-```
-OPENAI_API_KEY=sua_chave_aqui
-DEEPSEEK_API_KEY=sua_chave_aqui
+Para iniciar tanto a API quanto a interface Streamlit com um único comando:
+
+```bash
+python start_pubmed_agent.py
 ```
 
-3. Execute a interface Streamlit:
+Este script iniciará automaticamente a API FastAPI na porta 8000 e a interface Streamlit na porta 8501.
+
+### Método 2: Inicialização Separada
+
+Para iniciar o servidor:
+
+```bash
+uvicorn app.main:app --reload
 ```
+
+A API estará disponível em `http://localhost:8000`, e a documentação interativa (Swagger UI) em `http://localhost:8000/docs`.
+
+Para iniciar a interface Streamlit em outra janela de terminal:
+
+```bash
+python run_streamlit.py
+```
+
+Ou diretamente com o Streamlit:
+
+```bash
 streamlit run app/frontend/streamlit_app.py
 ```
 
-4. Ou execute a API FastAPI:
+### Verificando a Instalação
+
+Para verificar se a API está funcionando corretamente:
+
+```bash
+python test_api_only.py  # Teste simples de disponibilidade
+python test_api_only.py --full  # Teste completo com uma consulta
 ```
-uvicorn app.main:app --reload
+
+Para verificar o deploy no Streamlit Cloud:
+
+```bash
+python test_deploy.py
 ```
 
 ## Requisitos
@@ -152,79 +178,8 @@ pip install -r requirements.txt
 
 4. Configure as variáveis de ambiente no arquivo `.env` (já criado com suas chaves de API)
 
-## Execução
-
-Para iniciar o servidor:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-A API estará disponível em `http://localhost:8000`, e a documentação interativa (Swagger UI) em `http://localhost:8000/docs`.
-
 ## Uso da API
 
 ### Endpoint Principal
 
-`POST /api/search`
-
-Corpo da requisição:
-```json
-{
-  "picott_text": "Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O) em ensaios clínicos randomizados (T tipo de estudo) com seguimento de 6 meses (T tempo)"
-}
-```
-
-Resposta:
-```json
-{
-  "original_query": "Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O) em ensaios clínicos randomizados (T tipo de estudo) com seguimento de 6 meses (T tempo)",
-  "best_pubmed_query": "(\"diabetes tipo 2\"[tiab] OR \"DM2\"[tiab]) AND (\"metformina\"[tiab] OR \"biguanida\"[tiab]) AND \"HbA1c\"[tiab] AND (\"randomized controlled trial\"[tiab] OR \"RCT\"[tiab]) AND \"6 months\"[tiab]",
-  "iterations": [
-    {
-      "iteration_number": 1,
-      "query": "\"diabetes tipo 2\"[tiab] AND \"metformina\"[tiab] AND \"HbA1c\"[tiab] AND \"randomized controlled trial\"[tiab] AND \"6 months\"[tiab]",
-      "result_count": 12,
-      "evaluation": {
-        "total_count": 12,
-        "count_score": 0.12,
-        "primary_studies_ratio": 0.8,
-        "systematic_reviews_ratio": 0.0,
-        "average_relevance": 0.56,
-        "overall_score": 0.34,
-        "issues": "Consulta muito específica, poucos resultados encontrados"
-      },
-      "refinement_reason": "Consulta inicial gerada a partir do texto PICOTT"
-    },
-    {
-      "iteration_number": 2,
-      "query": "(\"diabetes tipo 2\"[tiab] OR \"DM2\"[tiab]) AND (\"metformina\"[tiab] OR \"biguanida\"[tiab]) AND \"HbA1c\"[tiab] AND (\"randomized controlled trial\"[tiab] OR \"RCT\"[tiab]) AND \"6 months\"[tiab]",
-      "result_count": 38,
-      "evaluation": {
-        "total_count": 38,
-        "count_score": 0.38,
-        "primary_studies_ratio": 0.8,
-        "systematic_reviews_ratio": 0.2,
-        "average_relevance": 0.62,
-        "overall_score": 0.55,
-        "issues": "Consulta relativamente específica, considere ampliar os termos"
-      },
-      "refinement_reason": "Refinamento necessário para corrigir: Consulta muito específica, poucos resultados encontrados"
-    }
-  ]
-}
-```
-
-## Componentes Principais
-
-1. **QueryGenerator**: Transforma a pergunta PICOTT em consulta PubMed estruturada
-2. **PubMedService**: Comunica-se com a API do PubMed para buscar artigos
-3. **QueryEvaluator**: Avalia e refina iterativamente a consulta para obter resultados ótimos
-
-## Configurações
-
-Todas as configurações são carregadas do arquivo `.env` e podem ser acessadas através do módulo `app.core.config`.
-
-## API do PubMed
-
-O agente utiliza a API NCBI E-utilities para realizar as consultas no PubMed. Isso permite a busca eficiente e o acesso a metadados detalhados dos artigos.
+`
