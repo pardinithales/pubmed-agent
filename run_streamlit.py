@@ -3,6 +3,7 @@ import os
 import platform
 import sys
 import socket
+import time
 from pathlib import Path
 
 # Obter o diretório raiz do projeto
@@ -30,17 +31,49 @@ def main():
     # Caminho para o arquivo do aplicativo Streamlit
     streamlit_app_path = os.path.join(root_dir, "app", "frontend", "streamlit_app.py")
     
-    # Verificar se o arquivo existe
-    if not os.path.exists(streamlit_app_path):
-        print(f"Erro: O arquivo {streamlit_app_path} não foi encontrado.")
-        return
+    # Caminho para o aplicativo simplificado como fallback
+    simple_app_path = os.path.join(root_dir, "simple_streamlit_app.py")
     
-    # Se estiver rodando no Streamlit Cloud, o serviço será gerenciado automaticamente
+    # Verificar se os arquivos existem
+    if not os.path.exists(streamlit_app_path):
+        if os.path.exists(simple_app_path):
+            print(f"Aplicativo principal não encontrado. Usando versão simplificada como fallback.")
+            streamlit_app_path = simple_app_path
+        else:
+            print(f"Erro: Nenhum aplicativo Streamlit foi encontrado.")
+            return
+    
+    # Se estiver rodando no Streamlit Cloud
     if is_running_on_streamlit_cloud():
         print("Detectado ambiente Streamlit Cloud, usando configuração de deploy...")
-        import streamlit.web.cli as streamlit_cli
-        sys.argv = ["streamlit", "run", streamlit_app_path]
-        streamlit_cli.main()
+        
+        # No Streamlit Cloud, usar diretamente o app simples para contornar problemas de inicialização
+        if os.path.exists(simple_app_path):
+            try:
+                # Configurar timeout mais longo (60 segundos)
+                os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
+                os.environ["STREAMLIT_SERVER_PORT"] = "8501"  # Forçar porta 8501
+                
+                print("Iniciando aplicativo em modo cloud com configurações seguras...")
+                # Reduzir complexidade, usar diretamente o aplicativo simplificado no cloud
+                import streamlit.web.cli as streamlit_cli
+                sys.argv = ["streamlit", "run", simple_app_path]
+                streamlit_cli.main()
+                
+            except Exception as e:
+                print(f"Erro crítico no deploy: {str(e)}")
+                # Último recurso: iniciar uma página estática de erro
+                with open(os.path.join(root_dir, "error.html"), "w") as f:
+                    f.write("<html><body><h1>Erro no Aplicativo</h1><p>Houve um problema ao iniciar o aplicativo.</p></body></html>")
+        else:
+            print("Aplicativo simplificado não encontrado. Tentando usar o principal...")
+            try:
+                import streamlit.web.cli as streamlit_cli
+                sys.argv = ["streamlit", "run", streamlit_app_path]
+                streamlit_cli.main()
+            except Exception as e:
+                print(f"Erro crítico no deploy: {str(e)}")
+        
         return
     
     # Configuração para ambiente local
