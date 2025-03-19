@@ -21,11 +21,11 @@ root_dir = Path(__file__).resolve().parent
 is_cloud = os.environ.get('STREAMLIT_SHARING') == 'true' or os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app')
 mode = "Cloud" if is_cloud else "Local"
 
-# URL da API - usar a URL do Vercel em produção
-API_BASE_URL = "https://pubmed-search-api.vercel.app"  # Substitua pelo URL real do seu deploy no Vercel
+# URL da API - usar a URL da VPS em produção
+API_BASE_URL = "http://5.161.199.194:8080"  # API hospedada na VPS
 LOCAL_API_URL = "http://localhost:8000"
 
-# Definir URL da API baseado no ambiente
+# Definir URL da API baseado no ambiente (sempre usar a VPS no Streamlit Cloud)
 api_url = API_BASE_URL if is_cloud else LOCAL_API_URL
 
 # Título e descrição

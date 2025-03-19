@@ -83,9 +83,25 @@ Para implantar a aplicação no Streamlit Cloud, siga estas etapas:
 
 Observação: A aplicação verificará automaticamente se as chaves de API obrigatórias estão configuradas e exibirá uma mensagem de erro caso estejam faltando.
 
+## Arquitetura do Sistema
+
+O sistema utiliza uma arquitetura distribuída:
+
+1. **Backend/API**: Hospedado em um servidor VPS dedicado
+   - FastAPI para criar endpoints RESTful
+   - Gunicorn como servidor de produção
+   - Implementação de busca otimizada para PubMed
+
+2. **Frontend**: Hospedado no Streamlit Cloud
+   - Interface de usuário intuitiva
+   - Conecta-se à API hospedada na VPS
+   - Processamento de formulários e exibição de resultados
+
+Esta arquitetura resolve o problema de limitações do Streamlit Cloud, permitindo que a API possa ser executada com todas as dependências necessárias no servidor VPS, enquanto o frontend permanece no ambiente especializado do Streamlit Cloud.
+
 ## Execução
 
-### Método 1: Inicialização Unificada (Recomendado)
+### Método 1: Inicialização Unificada (Recomendado para Desenvolvimento)
 
 Para iniciar tanto a API quanto a interface Streamlit com um único comando:
 
