@@ -3,52 +3,56 @@ import sys
 import os
 from pathlib import Path
 
-# Configurações da página
+# Configurações mínimas da página
 st.set_page_config(
     page_title="PubMed Agent (Versão Simplificada)",
     page_icon="🔍",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"  # Iniciar com sidebar recolhida para acelerar carregamento
 )
 
 # Configurar o caminho para o diretório raiz do projeto
 root_dir = Path(__file__).resolve().parent
-sys.path.append(str(root_dir))
 
+# Título e descrição
 st.title("🔍 Assistente de Consultas PubMed (Versão Simplificada)")
-st.markdown("Esta é uma versão simplificada do aplicativo para debug. Utilize-a quando a versão completa estiver com problemas.")
+st.markdown("Esta é uma versão simplificada do aplicativo para diagnóstico. Utilize-a quando a versão completa estiver com problemas.")
 
-# Mostrar status das chaves de API
-st.header("Status das Chaves de API")
+# Verificar status de inicialização
+st.success("✅ Aplicativo inicializado com sucesso!")
 
-api_keys = {
-    "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY") or (st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None),
-    "DEEPSEEK_API_KEY": os.environ.get("DEEPSEEK_API_KEY") or (st.secrets.get("DEEPSEEK_API_KEY") if hasattr(st, "secrets") else None),
-    "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY") or (st.secrets.get("ANTHROPIC_API_KEY") if hasattr(st, "secrets") else None),
-    "OPENROUTER_API_KEY": os.environ.get("OPENROUTER_API_KEY") or (st.secrets.get("OPENROUTER_API_KEY") if hasattr(st, "secrets") else None),
-    "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY") or (st.secrets.get("GEMINI_API_KEY") if hasattr(st, "secrets") else None)
+# Mostrar informações básicas sobre o ambiente
+st.subheader("Informações do Ambiente")
+env_info = {
+    "Ambiente": "Streamlit Cloud" if os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app') else "Local",
+    "Modo Simplificado": "Ativo",
+    "Diretório Raiz": str(root_dir)
 }
+st.json(env_info)
 
-for key, value in api_keys.items():
-    if value:
-        st.success(f"{key}: ✅ Configurada")
-    else:
-        st.error(f"{key}: ❌ Não configurada")
+# Status das chaves de API - versão simplificada
+st.subheader("Status das Chaves de API")
+api_keys = {
+    "OPENAI_API_KEY": "✅ Configurada" if os.environ.get("OPENAI_API_KEY") or (hasattr(st, "secrets") and st.secrets.get("OPENAI_API_KEY")) else "❌ Não configurada",
+    "DEEPSEEK_API_KEY": "✅ Configurada" if os.environ.get("DEEPSEEK_API_KEY") or (hasattr(st, "secrets") and st.secrets.get("DEEPSEEK_API_KEY")) else "❌ Não configurada",
+}
+st.json(api_keys)
 
 # Formulário simplificado
-st.header("Consulta PubMed Simplificada")
+st.subheader("Consulta PubMed Simplificada")
 
 with st.form("picott_form_simple"):
     picott_text = st.text_area(
-        "Digite sua pergunta clínica no formato PICOTT:",
-        height=150,
-        placeholder="P: População\nI: Intervenção\nC: Comparação\nO: Desfecho (Outcome)\nT: Tipo de estudo\nT: Tempo"
+        "Digite sua pergunta clínica:",
+        height=100,
+        placeholder="Ex: Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O)"
     )
     
     submit_button = st.form_submit_button("Gerar Consulta")
 
 # Processar quando o formulário for enviado
 if submit_button and picott_text:
-    st.header("Consulta Gerada")
+    st.subheader("Consulta Gerada")
     
     # Simulação de consulta para demonstração
     st.code(f"""
@@ -61,23 +65,15 @@ if submit_button and picott_text:
     """)
     
     st.info("Este é apenas um exemplo de consulta. Na versão completa do aplicativo, a consulta seria gerada por um modelo de IA.")
-    
-    # Explicação sobre a versão simplificada
-    st.header("Por que estou vendo a versão simplificada?")
-    st.markdown("""
-    Esta versão simplificada foi criada para ajudar a diagnosticar problemas no deploy da versão completa do aplicativo.
-    
-    Possíveis razões para problemas no deploy:
-    1. **Configuração de chaves de API:** Verifique se todas as chaves necessárias estão configuradas no Streamlit Cloud.
-    2. **Problemas de importação:** Pode haver erros ao importar módulos específicos.
-    3. **Timeout de requisições:** A geração da consulta pode estar excedendo o tempo limite.
-    
-    Para resolver:
-    1. Acesse o painel de controle do Streamlit Cloud e verifique as secrets.
-    2. Verifique os logs para identificar erros específicos.
-    3. Se necessário, ajuste o código para torná-lo mais simples e robusto.
-    """)
 
-# Link para a página de debug
+# Explicação sobre a versão simplificada
 st.markdown("---")
-st.markdown("[Acessar Diagnóstico de Deploy](debug_deploy) | [Acessar Teste Básico](test_deploy)") 
+st.markdown("""
+### Por que estou vendo a versão simplificada?
+
+Esta versão simplificada foi criada para ajudar a diagnosticar problemas no deploy da versão completa do aplicativo.
+
+A equipe de desenvolvimento está trabalhando para resolver os problemas na versão completa. Por favor, aguarde ou entre em contato com o suporte.
+""")
+
+# Link para diagnóstico - removido para simplificar ainda mais 
