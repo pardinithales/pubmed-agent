@@ -17,8 +17,13 @@ st.set_page_config(
 # Configurar o caminho para o diretório raiz do projeto
 root_dir = Path(__file__).resolve().parent
 
+# FORÇAR MODO CLOUD E URL DA VPS NO STREAMLIT CLOUD
+# Remover esta linha para voltar ao comportamento anterior
+FORCE_CLOUD_MODE = True
+
 # Detectar ambiente - método melhorado
 is_cloud = (
+    FORCE_CLOUD_MODE or
     os.environ.get('STREAMLIT_SHARING') == 'true' or 
     os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app') or
     'STREAMLIT_RUNTIME_CLOUD' in os.environ or
@@ -30,6 +35,9 @@ mode = "Cloud" if is_cloud else "Local"
 # URL da API - usar a URL da VPS em produção
 API_BASE_URL = "http://5.161.199.194:8080"  # API hospedada na VPS
 LOCAL_API_URL = "http://localhost:8000"
+
+# Forçar uso da API da VPS em modo Cloud 
+api_url = API_BASE_URL if is_cloud else LOCAL_API_URL
 
 # Verificar se há uma URL de API específica nas secrets
 if hasattr(st, "secrets") and "API_URL" in st.secrets:
