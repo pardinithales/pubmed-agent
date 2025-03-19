@@ -1,0 +1,54 @@
+# Diretórios locais
+/__pycache__/
+/.git/
+/.github/
+/.vscode/
+/.pytest_cache/
+/venv/
+/env/
+/.virtualenv/
+/.env/
+/node_modules/
+/logs/
+/temp/
+/tmp/
+
+# Diretórios específicos da aplicação
+/app/frontend/
+/app/tests/
+/app/__pycache__/
+
+# Arquivos grandes ou desnecessários
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.zip
+*.tar.gz
+*.db
+*.sqlite
+*.log
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Arquivos específicos
+README.md
+VERCEL_DEPLOY.md
+run_local.py
+run_streamlit.py
+simple_streamlit.py
+streamlit_app.py
+test_*.py
+start_pubmed_agent.py
+setup_cloud.py
+streamlit_cloud_config.py
+
+# Mantenha apenas arquivos essenciais
+!api_server.py
+!vercel.json
+!requirements-vercel.txt
+!.vercelignore 
