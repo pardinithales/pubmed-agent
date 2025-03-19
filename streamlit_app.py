@@ -38,6 +38,19 @@ st.success(f"✅ Aplicativo inicializado com sucesso no ambiente {mode}!")
 # Mostrar informações sobre a API na sidebar
 with st.sidebar:
     st.header("Informações da API")
+    
+    # Adicionar opção para escolher API (somente em ambiente local)
+    if not is_cloud:
+        use_vps_api = st.checkbox("Usar API da VPS", value=False, 
+                                help="Marque para usar a API hospedada na VPS em vez da API local")
+        # Redefinir api_url baseado na escolha
+        if use_vps_api:
+            api_url = API_BASE_URL
+            st.success("Usando API remota na VPS")
+        else:
+            api_url = LOCAL_API_URL
+            st.info("Usando API local")
+    
     api_status = st.empty()
     
     # Verificar status da API
