@@ -4,10 +4,69 @@ import platform
 import sys
 import socket
 import time
+import importlib
 from pathlib import Path
+import atexit
 
 # Obter o diretório raiz do projeto
 root_dir = Path(__file__).resolve().parent
+
+def check_and_install_dependencies():
+    """Verifica e instala dependências faltantes do projeto."""
+    print("Verificando dependências...")
+    
+    # Lista de dependências críticas para verificar
+    critical_deps = [
+        "fastapi", "uvicorn", "httpx", "streamlit", 
+        "pydantic", "pydantic_settings", "python-dotenv"
+    ]
+    
+    missing_deps = []
+    
+    # Verificar cada dependência
+    for dep in critical_deps:
+        try:
+            # Tenta importar o módulo
+            if dep == "python-dotenv":
+                importlib.import_module("dotenv")
+            elif dep == "pydantic_settings":
+                importlib.import_module("pydantic_settings")
+            else:
+                importlib.import_module(dep)
+        except ImportError:
+            # Se falhar, adiciona à lista de dependências faltantes
+            missing_deps.append(dep.replace("_", "-"))
+    
+    # Se houver dependências faltantes, instala-as
+    if missing_deps:
+        print(f"Dependências faltantes detectadas: {', '.join(missing_deps)}")
+        print("Instalando dependências...")
+        
+        # Instala as dependências faltantes
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing_deps)
+            print("✅ Dependências instaladas com sucesso!")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Erro ao instalar dependências: {e}")
+            print("Por favor, instale manualmente as dependências faltantes:")
+            print(f"  pip install {' '.join(missing_deps)}")
+            return False
+    else:
+        print("✅ Todas as dependências críticas estão instaladas!")
+    
+    # Verificar também se todas as dependências do requirements.txt estão instaladas
+    try:
+        req_path = os.path.join(root_dir, "requirements.txt")
+        if os.path.exists(req_path):
+            print("Verificando todas as dependências do requirements.txt...")
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", "-r", req_path, "--quiet"
+            ])
+            print("✅ Todas as dependências do requirements.txt estão instaladas!")
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Aviso: Algumas dependências do requirements.txt podem estar faltando: {e}")
+    
+    return True
 
 def is_port_in_use(port):
     """Verifica se uma porta está em uso."""
@@ -25,12 +84,73 @@ def is_running_on_streamlit_cloud():
     """Verifica se o código está rodando no Streamlit Cloud."""
     return os.environ.get('STREAMLIT_SHARING') == 'true' or os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app')
 
+def start_fastapi_server():
+    """Inicia o servidor FastAPI em segundo plano."""
+    try:
+        # Verifica se a porta 8000 já está em uso
+        if is_port_in_use(8000):
+            print("Porta 8000 já está em uso, presumindo que a API já está rodando.")
+            return None
+
+        print("Iniciando o servidor FastAPI na porta 8000...")
+        
+        # Comando para iniciar o servidor FastAPI
+        if platform.system() == "Windows":
+            # No Windows, usamos subprocess.Popen sem shell=True para evitar problemas
+            api_process = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        else:
+            # Em outros sistemas operacionais
+            api_process = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"],
+                preexec_fn=os.setpgrp
+            )
+        
+        # Função para encerrar o processo da API quando o programa principal terminar
+        def cleanup_api_process():
+            try:
+                if api_process:
+                    if platform.system() == "Windows":
+                        subprocess.call(['taskkill', '/F', '/T', '/PID', str(api_process.pid)])
+                    else:
+                        api_process.terminate()
+                    print("Servidor FastAPI encerrado.")
+            except Exception as e:
+                print(f"Erro ao encerrar o servidor FastAPI: {e}")
+        
+        # Registra a função de limpeza
+        atexit.register(cleanup_api_process)
+        
+        # Espera até que a API esteja pronta (máximo de 10 segundos)
+        max_retries = 20
+        retry_interval = 0.5
+        for i in range(max_retries):
+            if is_port_in_use(8000):
+                print(f"Servidor FastAPI iniciado com sucesso após {i * retry_interval:.1f} segundos")
+                time.sleep(1)  # Aguarda mais um pouco para o servidor estabilizar
+                return api_process
+            time.sleep(retry_interval)
+        
+        print("Aviso: Falha ao confirmar que o servidor FastAPI está rodando, continuando mesmo assim...")
+        return api_process
+    
+    except Exception as e:
+        print(f"Erro ao iniciar o servidor FastAPI: {e}")
+        return None
+
 def main():
     print("Iniciando a interface Streamlit para pesquisa no PubMed...")
     
+    # Verificar e instalar dependências
+    if not check_and_install_dependencies():
+        print("❌ Não foi possível continuar devido a dependências faltantes.")
+        return
+    
     # Se estiver rodando no Streamlit Cloud, sempre usar o app simplificado
     if is_running_on_streamlit_cloud():
-        print("Detectado ambiente Streamlit Cloud, usando configuração de deploy...")
+        print("Detectado ambiente Streamlit Cloud, usando modo simplificado...")
         
         # Caminho para o aplicativo simplificado
         simple_app_path = os.path.join(root_dir, "simple_streamlit_app.py")
@@ -44,10 +164,11 @@ def main():
                 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Desativar estatísticas
                 os.environ["STREAMLIT_THEME_BASE"] = "light"  # Tema mais leve
                 os.environ["FORCE_SIMPLE_APP"] = "true"  # Flag para forçar app simples
+                os.environ["API_OFFLINE_MODE"] = "true"  # Flag para indicar que API não está disponível
                 
-                print("Iniciando aplicativo simplificado em modo cloud com configurações seguras...")
+                print("Iniciando aplicativo simplificado em modo cloud...")
                 import streamlit.web.cli as streamlit_cli
-                sys.argv = ["streamlit", "run", simple_app_path, "--server.maxUploadSize=5"]
+                sys.argv = ["streamlit", "run", simple_app_path]
                 streamlit_cli.main()
                 
             except Exception as e:
@@ -94,7 +215,10 @@ st.info("Este é um aplicativo de emergência criado automaticamente.")
     # Configuração para ambiente local
     print("Iniciando em ambiente local...")
     
-    # Encontrar uma porta disponível
+    # Iniciar a API FastAPI em segundo plano primeiro
+    api_process = start_fastapi_server()
+    
+    # Encontrar uma porta disponível para o Streamlit
     port = find_free_port()
     if not port:
         print("Erro: Não foi possível encontrar uma porta disponível.")
