@@ -48,6 +48,41 @@ O projeto inclui uma interface web interativa construída com Streamlit que perm
 - Configurar o número de iterações e parâmetros de refinamento
 - Visualizar os resultados finais com links diretos para o PubMed
 
+## Melhorias na Interface do Usuário
+- Adicionadas opções avançadas de pesquisa
+- Implementada a visualização detalhada de filtros aplicados
+- Adicionada explicação sobre a eficácia e fonte de cada filtro
+- Implementado sistema de exportação de consulta em múltiplos formatos
+
+## Configuração do Ambiente
+
+### Configuração Local
+1. Clone o repositório
+2. Instale as dependências: `pip install -r requirements.txt`
+3. Copie o arquivo `.env.example` para `.env` e preencha com suas chaves de API
+4. Execute a aplicação: `python run_streamlit.py`
+
+### Configuração no Streamlit Cloud
+Para implantar a aplicação no Streamlit Cloud, siga estas etapas:
+
+1. Faça o upload do código para um repositório GitHub
+2. Conecte o Streamlit Cloud ao seu repositório
+3. Configure as secrets necessárias no dashboard do Streamlit Cloud:
+   - Acesse "App settings" > "Secrets" 
+   - Adicione as seguintes variáveis no formato TOML:
+   ```toml
+   OPENAI_API_KEY = "sua-chave-aqui"
+   DEEPSEEK_API_KEY = "sua-chave-aqui"
+   ANTHROPIC_API_KEY = "sua-chave-aqui" # opcional
+   OPENROUTER_API_KEY = "sua-chave-aqui" # opcional
+   GEMINI_API_KEY = "sua-chave-aqui" # opcional
+   PUBMED_EMAIL = "seu-email@example.com"
+   ```
+4. Defina como arquivo principal: `run_streamlit.py`
+5. Inicie o deploy
+
+Observação: A aplicação verificará automaticamente se as chaves de API obrigatórias estão configuradas e exibirá uma mensagem de erro caso estejam faltando.
+
 ## Como Executar
 
 1. Instale as dependências:

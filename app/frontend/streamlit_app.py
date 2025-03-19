@@ -9,6 +9,20 @@ import urllib.parse
 root_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_dir))
 
+# Configuração segura das chaves de API usando o sistema de secrets do Streamlit
+# No ambiente de deploy do Streamlit Cloud, configure as secrets via dashboard
+# https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/secrets-management
+if not os.environ.get("OPENAI_API_KEY") and hasattr(st, "secrets") and "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+if not os.environ.get("DEEPSEEK_API_KEY") and hasattr(st, "secrets") and "DEEPSEEK_API_KEY" in st.secrets:
+    os.environ["DEEPSEEK_API_KEY"] = st.secrets["DEEPSEEK_API_KEY"]
+if not os.environ.get("ANTHROPIC_API_KEY") and hasattr(st, "secrets") and "ANTHROPIC_API_KEY" in st.secrets:
+    os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
+if not os.environ.get("OPENROUTER_API_KEY") and hasattr(st, "secrets") and "OPENROUTER_API_KEY" in st.secrets:
+    os.environ["OPENROUTER_API_KEY"] = st.secrets["OPENROUTER_API_KEY"]
+if not os.environ.get("GEMINI_API_KEY") and hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+
 from app.services.query_generator import QueryGenerator
 from app.services.pubmed_service import PubMedService
 from app.services.query_evaluator import QueryEvaluator
@@ -75,6 +89,33 @@ def get_services():
         "pubmed_service": pubmed_service,
         "query_evaluator": query_evaluator
     }
+
+# Função para verificar se as chaves de API necessárias estão configuradas
+def check_api_keys():
+    missing_keys = []
+    
+    if not os.environ.get("OPENAI_API_KEY"):
+        missing_keys.append("OPENAI_API_KEY")
+    
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        missing_keys.append("DEEPSEEK_API_KEY")
+    
+    if missing_keys:
+        st.error(f"""
+        ⚠️ **Configuração Incompleta** ⚠️
+        
+        As seguintes chaves de API estão faltando:
+        {', '.join(missing_keys)}
+        
+        No Streamlit Cloud, você precisa adicionar estas chaves no painel de Secrets:
+        1. Acesse o painel do aplicativo no Streamlit Cloud
+        2. Vá para Configurações > Secrets
+        3. Adicione as chaves de API faltantes
+        
+        Para desenvolvimento local, adicione-as ao arquivo .env na raiz do projeto.
+        """)
+        return False
+    return True
 
 # Estilo personalizado
 st.markdown("""
@@ -231,6 +272,13 @@ if submit_button and picott_text:
         query_generator = services["query_generator"]
         pubmed_service = services["pubmed_service"]
         query_evaluator = services["query_evaluator"]
+        
+        # Verificar configuração de API keys
+        api_keys_ok = check_api_keys()
+        
+        # Se as chaves de API estiverem faltando, interrompe a execução
+        if not api_keys_ok:
+            st.stop()
         
         # Cria um placeholder para cada etapa do processo
         search_progress = st.empty()
