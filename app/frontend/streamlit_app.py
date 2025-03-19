@@ -78,7 +78,7 @@ def highlight_query_differences(old_query, new_query):
     return html
 
 # Inicializa as classes de serviço
-@st.cache_resource
+# @st.cache_resource  # Removido o decorador para inicialização lazy
 def get_services():
     pubmed_service = PubMedService()
     query_generator = QueryGenerator()
@@ -268,6 +268,7 @@ if submit_button and picott_text:
     st.markdown("<h2 class='results-header'>Processando Pesquisa...</h2>", unsafe_allow_html=True)
     
     try:
+        # Inicialização lazy dos serviços apenas quando o formulário é enviado
         services = get_services()
         query_generator = services["query_generator"]
         pubmed_service = services["pubmed_service"]
