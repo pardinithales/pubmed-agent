@@ -17,16 +17,30 @@ st.set_page_config(
 # Configurar o caminho para o diretório raiz do projeto
 root_dir = Path(__file__).resolve().parent
 
-# Detectar ambiente
-is_cloud = os.environ.get('STREAMLIT_SHARING') == 'true' or os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app')
+# Detectar ambiente - método melhorado
+is_cloud = (
+    os.environ.get('STREAMLIT_SHARING') == 'true' or 
+    os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app') or
+    'STREAMLIT_RUNTIME_CLOUD' in os.environ or
+    '.streamlit.app' in os.environ.get('HOSTNAME', '') or
+    os.environ.get('IS_STREAMLIT_CLOUD') == 'true'
+)
 mode = "Cloud" if is_cloud else "Local"
 
 # URL da API - usar a URL da VPS em produção
 API_BASE_URL = "http://5.161.199.194:8080"  # API hospedada na VPS
 LOCAL_API_URL = "http://localhost:8000"
 
-# Definir URL da API baseado no ambiente (sempre usar a VPS no Streamlit Cloud)
-api_url = API_BASE_URL if is_cloud else LOCAL_API_URL
+# Verificar se há uma URL de API específica nas secrets
+if hasattr(st, "secrets") and "API_URL" in st.secrets:
+    api_url = st.secrets["API_URL"]
+    print(f"Usando API URL das secrets: {api_url}")
+elif is_cloud:
+    api_url = API_BASE_URL
+    print(f"Usando API da VPS: {api_url}")
+else:
+    api_url = LOCAL_API_URL
+    print(f"Usando API local: {api_url}")
 
 # Título e descrição
 st.title("🔍 Assistente de Consultas PubMed")
@@ -39,10 +53,39 @@ st.success(f"✅ Aplicativo inicializado com sucesso no ambiente {mode}!")
 with st.sidebar:
     st.header("Informações da API")
     
+    # Diagnóstico de secrets (temporário)
+    st.subheader("Debug Secrets")
+    has_secrets = hasattr(st, "secrets")
+    st.write(f"Tem acesso a secrets: {has_secrets}")
+    
+    if has_secrets:
+        secret_keys = dir(st.secrets)
+        general_keys = []
+        if hasattr(st.secrets, "keys"):
+            try:
+                general_keys = list(st.secrets.keys())
+            except:
+                st.write("Erro ao listar chaves gerais")
+        
+        st.write(f"Chaves gerais: {general_keys}")
+        st.write(f"Atributos de secrets: {[k for k in secret_keys if not k.startswith('__')]}")
+        
+        # Verificar chaves específicas
+        if "OPENAI_API_KEY" in st.secrets:
+            st.write("OPENAI_API_KEY encontrada diretamente!")
+            masked_key = st.secrets["OPENAI_API_KEY"][:5] + "..." if st.secrets["OPENAI_API_KEY"] else "vazia"
+            st.write(f"Chave (primeiros 5 chars): {masked_key}")
+        
+        # Verificar estrutura aninhada
+        if hasattr(st.secrets, "general"):
+            st.write("Bloco [general] encontrado!")
+            if hasattr(st.secrets.general, "OPENAI_API_KEY"):
+                st.write("OPENAI_API_KEY encontrada em general!")
+    
     # Adicionar opção para escolher API (somente em ambiente local)
     if not is_cloud:
         use_vps_api = st.checkbox("Usar API da VPS", value=False, 
-                                help="Marque para usar a API hospedada na VPS em vez da API local")
+                               help="Marque para usar a API hospedada na VPS em vez da API local")
         # Redefinir api_url baseado na escolha
         if use_vps_api:
             api_url = API_BASE_URL
@@ -78,9 +121,26 @@ st.json(env_info)
 
 # Status das chaves de API
 st.subheader("Status das Chaves de API")
+
+# Função melhorada para verificar chaves de API
+def check_api_key(key_name):
+    # Verificar diretamente nas secrets
+    if hasattr(st, "secrets") and key_name in st.secrets:
+        return True
+    
+    # Verificar no bloco general das secrets
+    if hasattr(st, "secrets") and hasattr(st.secrets, "general") and hasattr(st.secrets.general, key_name):
+        return True
+    
+    # Verificar nas variáveis de ambiente
+    if os.environ.get(key_name):
+        return True
+    
+    return False
+
 api_keys = {
-    "OPENAI_API_KEY": "✅ Configurada" if os.environ.get("OPENAI_API_KEY") or (hasattr(st, "secrets") and st.secrets.get("OPENAI_API_KEY")) else "❌ Não configurada",
-    "DEEPSEEK_API_KEY": "✅ Configurada" if os.environ.get("DEEPSEEK_API_KEY") or (hasattr(st, "secrets") and st.secrets.get("DEEPSEEK_API_KEY")) else "❌ Não configurada",
+    "OPENAI_API_KEY": "✅ Configurada" if check_api_key("OPENAI_API_KEY") else "❌ Não configurada",
+    "DEEPSEEK_API_KEY": "✅ Configurada" if check_api_key("DEEPSEEK_API_KEY") else "❌ Não configurada",
 }
 st.json(api_keys)
 
