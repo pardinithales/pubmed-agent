@@ -111,6 +111,14 @@ with st.sidebar:
 
 # Mostrar informações básicas sobre o ambiente
 st.subheader("Informações do Ambiente")
+
+# Forçar URL da API da VPS sempre que estivermos no Streamlit Cloud
+is_streamlit_app_domain = os.environ.get('HOSTNAME', '').endswith('.streamlit.app')
+if is_streamlit_app_domain:
+    api_url = "http://5.161.199.194:8080"  # Forçar URL da VPS
+    mode = "Cloud"  # Forçar modo Cloud
+    print(f"Forçando modo Cloud e URL da VPS: {api_url}")
+
 env_info = {
     "Ambiente": mode,
     "API URL": api_url,
