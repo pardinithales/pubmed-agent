@@ -1,79 +1,65 @@
-import streamlit as st
-import sys
-import os
-from pathlib import Path
+import asyncio
+import httpx
+import json
+import traceback
 
-# Configurações mínimas da página
-st.set_page_config(
-    page_title="PubMed Agent (Versão Simplificada)",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="collapsed"  # Iniciar com sidebar recolhida para acelerar carregamento
-)
-
-# Configurar o caminho para o diretório raiz do projeto
-root_dir = Path(__file__).resolve().parent
-
-# Título e descrição
-st.title("🔍 Assistente de Consultas PubMed (Versão Simplificada)")
-st.markdown("Esta é uma versão simplificada do aplicativo para diagnóstico. Utilize-a quando a versão completa estiver com problemas.")
-
-# Verificar status de inicialização
-st.success("✅ Aplicativo inicializado com sucesso!")
-
-# Mostrar informações básicas sobre o ambiente
-st.subheader("Informações do Ambiente")
-env_info = {
-    "Ambiente": "Streamlit Cloud" if os.environ.get('STREAMLIT_SERVER_URL', '').endswith('streamlit.app') else "Local",
-    "Modo Simplificado": "Ativo",
-    "Diretório Raiz": str(root_dir)
-}
-st.json(env_info)
-
-# Status das chaves de API - versão simplificada
-st.subheader("Status das Chaves de API")
-api_keys = {
-    "OPENAI_API_KEY": "✅ Configurada" if os.environ.get("OPENAI_API_KEY") or (hasattr(st, "secrets") and st.secrets.get("OPENAI_API_KEY")) else "❌ Não configurada",
-    "DEEPSEEK_API_KEY": "✅ Configurada" if os.environ.get("DEEPSEEK_API_KEY") or (hasattr(st, "secrets") and st.secrets.get("DEEPSEEK_API_KEY")) else "❌ Não configurada",
-}
-st.json(api_keys)
-
-# Formulário simplificado
-st.subheader("Consulta PubMed Simplificada")
-
-with st.form("picott_form_simple"):
-    picott_text = st.text_area(
-        "Digite sua pergunta clínica:",
-        height=100,
-        placeholder="Ex: Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O)"
-    )
+async def test_search_api():
+    """
+    Testa a API de busca com uma pergunta PICOTT de exemplo
+    """
+    # URL da API local
+    url = "http://localhost:8000/api/search"
     
-    submit_button = st.form_submit_button("Gerar Consulta")
-
-# Processar quando o formulário for enviado
-if submit_button and picott_text:
-    st.subheader("Consulta Gerada")
+    # Exemplo de consulta PICOTT
+    payload = {
+        "picott_text": "Pacientes adultos com diabetes tipo 2 (P) recebendo metformina (I) vs placebo (C) para redução de HbA1c (O) em ensaios clínicos randomizados (T tipo de estudo) com seguimento de 6 meses (T tempo)"
+    }
     
-    # Simulação de consulta para demonstração
-    st.code(f"""
-    ((População OR seu sinônimo OR outro termo) 
-    AND 
-    (Intervenção OR seu sinônimo OR outro termo))
+    print("Enviando requisição para a API...")
     
-    Sua consulta original:
-    {picott_text}
-    """)
+    # Primeiro, vamos verificar se o servidor está acessível
+    try:
+        async with httpx.AsyncClient() as client:
+            health_response = await client.get("http://localhost:8000/")
+            print(f"Servidor está acessível. Status: {health_response.status_code}")
+            print(f"Resposta da raiz: {health_response.text}")
+    except Exception as e:
+        print(f"Erro ao verificar servidor: {str(e)}")
+        print(f"Detalhes do erro: {traceback.format_exc()}")
     
-    st.info("Este é apenas um exemplo de consulta. Na versão completa do aplicativo, a consulta seria gerada por um modelo de IA.")
+    # Faz a requisição para a API
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            print("Tentando fazer requisição POST para /api/search...")
+            response = await client.post(url, json=payload)
+            
+            # Exibe o código de status
+            print(f"Status: {response.status_code}")
+            
+            # Se a requisição for bem-sucedida, exibe a resposta
+            if response.status_code == 200:
+                result = response.json()
+                print("\nResposta da API:")
+                print(f"Consulta original: {result['original_query']}")
+                print(f"Melhor consulta PubMed: {result['best_pubmed_query']}")
+                print(f"\nNúmero de iterações: {len(result['iterations'])}")
+                
+                # Exibe detalhes da primeira iteração
+                if result['iterations']:
+                    first_iter = result['iterations'][0]
+                    print(f"\nPrimeira iteração:")
+                    print(f"Query: {first_iter['query']}")
+                    print(f"Número de resultados: {first_iter['result_count']}")
+                    print(f"Razão para refinamento: {first_iter['refinement_reason']}")
+            else:
+                print(f"Erro na requisição: {response.text}")
+    
+    except httpx.ReadTimeout:
+        print("Timeout ao esperar resposta da API. A operação está demorando mais do que o esperado.")
+    except Exception as e:
+        print(f"Erro ao fazer a requisição: {str(e)}")
+        print(f"Detalhes do erro: {traceback.format_exc()}")
 
-# Explicação sobre a versão simplificada
-st.markdown("---")
-st.markdown("""
-### Por que estou vendo a versão simplificada?
-
-Esta versão simplificada foi criada para ajudar a diagnosticar problemas no deploy da versão completa do aplicativo.
-
-A equipe de desenvolvimento está trabalhando para resolver os problemas na versão completa. Por favor, aguarde ou entre em contato com o suporte.
-""")
-
-# Link para diagnóstico - removido para simplificar ainda mais 
+if __name__ == "__main__":
+    # Executa o teste de forma assíncrona
+    asyncio.run(test_search_api())
