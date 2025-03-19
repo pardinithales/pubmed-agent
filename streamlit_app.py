@@ -213,10 +213,19 @@ async def query_api(text, max_iterations=3):
 def simulate_query(text):
     """Simula uma resposta da API quando offline."""
     # Gerar termos a partir do texto
-    termos_p = [palavra for palavra in text.split() if len(palavra) > 3][:3]
-    termos_i = [palavra for palavra in text.split() if len(palavra) > 4][3:5]
+    words = [palavra for palavra in text.split() if len(palavra) > 3]
     
-    # Gerar consulta simulada
+    # Garantir que temos termos suficientes para população e intervenção
+    termos_p = words[:2] if len(words) >= 2 else ["população", "paciente"] 
+    termos_i = words[2:4] if len(words) >= 4 else ["intervenção", "tratamento"]
+    
+    # Garantir que cada lista tenha pelo menos 2 elementos
+    if len(termos_p) < 2:
+        termos_p.append("paciente")
+    if len(termos_i) < 2:
+        termos_i.append("tratamento")
+    
+    # Gerar consulta simulada com segurança
     consulta_simulada = f"""
     (("{termos_p[0]}"[tiab] OR "{termos_p[1]}"[tiab]) 
     AND 
