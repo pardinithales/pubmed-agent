@@ -17,7 +17,7 @@ st.set_page_config(
 # Configurar o caminho para o diretório raiz do projeto
 root_dir = Path(__file__).resolve().parent
 
-# FORÇAR MODO CLOUD E URL DA VPS NO STREAMLIT CLOUD
+# FORÇAR MODO CLOUD E URL DA API DA VPS NO STREAMLIT CLOUD
 # Remover esta linha para voltar ao comportamento anterior
 FORCE_CLOUD_MODE = True
 
@@ -49,6 +49,10 @@ elif is_cloud:
 else:
     api_url = LOCAL_API_URL
     print(f"Usando API local: {api_url}")
+
+# FORÇAR MODO OFFLINE NO STREAMLIT CLOUD - adicionado para resolver problemas de conexão com a API
+FORCE_OFFLINE_IN_CLOUD = True
+use_offline_mode = (is_cloud and FORCE_OFFLINE_IN_CLOUD)
 
 # Título e descrição
 st.title("🔍 Assistente de Consultas PubMed")
@@ -186,7 +190,9 @@ col1, col2 = st.columns([1, 1])
 with col1:
     max_iterations = st.slider("Número máximo de iterações", 1, 5, 3)
 with col2:
-    use_offline = st.checkbox("Usar modo offline (se API indisponível)", value=False)
+    use_offline = st.checkbox("Usar modo offline (se API indisponível)", value=use_offline_mode)
+    if use_offline_mode:
+        st.info("⚠️ Modo offline ativado automaticamente no ambiente Cloud")
 
 # Botão simples fora do formulário
 submit_button = st.button("Gerar Consulta Otimizada", type="primary", use_container_width=True)
@@ -252,7 +258,7 @@ if submit_button and picott_text:
     with st.spinner("Gerando consulta otimizada para PubMed..."):
         result = None
         
-        if not use_offline:
+        if not use_offline and not use_offline_mode:
             # Tentar usar a API
             try:
                 result = asyncio.run(query_api(picott_text, max_iterations))
@@ -262,7 +268,10 @@ if submit_button and picott_text:
         
         # Se API falhou ou modo offline solicitado, usar simulação
         if result is None:
-            st.warning("Usando modo offline (simulado). A consulta gerada é simplificada.")
+            if use_offline_mode:
+                st.info("Usando modo offline (ambiente Cloud). A consulta gerada é simplificada.")
+            else:
+                st.warning("Usando modo offline (simulado). A consulta gerada é simplificada.")
             result = simulate_query(picott_text)
         
         # Exibir resultados
