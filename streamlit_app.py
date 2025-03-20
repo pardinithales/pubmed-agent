@@ -51,7 +51,7 @@ else:
     print(f"Usando API local: {api_url}")
 
 # FORÇAR MODO OFFLINE NO STREAMLIT CLOUD - adicionado para resolver problemas de conexão com a API
-FORCE_OFFLINE_IN_CLOUD = True
+FORCE_OFFLINE_IN_CLOUD = False
 use_offline_mode = (is_cloud and FORCE_OFFLINE_IN_CLOUD)
 
 # Título e descrição
