@@ -61,6 +61,17 @@ class QueryEvaluator:
         evaluation = self._evaluate_search_result(search_result)
         score = evaluation.get("overall_score", 0.0)
         
+        # Obter abstracts para a primeira iteração se houver resultados
+        abstracts_sample = None
+        if search_result.ids:
+            try:
+                abstracts_sample = await self.pubmed_service.get_article_abstracts(
+                    search_result.ids, sample_size=5
+                )
+                logger.info(f"Obtidos {len(abstracts_sample)} abstracts para primeira iteração")
+            except Exception as e:
+                logger.error(f"Erro ao obter abstracts na primeira iteração: {str(e)}")
+        
         # Registra a primeira iteração
         iterations.append(
             QueryIteration(
@@ -68,9 +79,8 @@ class QueryEvaluator:
                 query=current_query,
                 result_count=search_result.total_count,
                 evaluation=evaluation,
-                refinement_reason=(
-                    "Consulta inicial gerada a partir do texto PICOTT"
-                )
+                refinement_reason="Consulta inicial gerada a partir do texto PICOTT",
+                abstracts_sample=abstracts_sample
             )
         )
         
@@ -88,8 +98,8 @@ class QueryEvaluator:
         for i in range(2, max_iterations + 1):
             logger.info(f"Iniciando iteração {i} de refinamento")
             
-            # Gera uma consulta refinada baseada na avaliação anterior
-            refined_query = await self._generate_refined_query(current_query, evaluation)
+            # Gera uma consulta refinada baseada na avaliação anterior e nos resultados da busca
+            refined_query = await self._generate_refined_query(current_query, evaluation, search_result)
             
             # Se a consulta refinada for igual à anterior, interrompe o ciclo
             if refined_query == current_query:
@@ -102,6 +112,17 @@ class QueryEvaluator:
             evaluation = self._evaluate_search_result(search_result)
             score = evaluation.get("overall_score", 0.0)
             
+            # Obter abstracts para esta iteração se houver resultados
+            abstracts_sample = None
+            if search_result.ids:
+                try:
+                    abstracts_sample = await self.pubmed_service.get_article_abstracts(
+                        search_result.ids, sample_size=5
+                    )
+                    logger.info(f"Obtidos {len(abstracts_sample)} abstracts para iteração {i}")
+                except Exception as e:
+                    logger.error(f"Erro ao obter abstracts na iteração {i}: {str(e)}")
+            
             # Registra esta iteração
             iterations.append(
                 QueryIteration(
@@ -109,7 +130,8 @@ class QueryEvaluator:
                     query=current_query,
                     result_count=search_result.total_count,
                     evaluation=evaluation,
-                    refinement_reason=self._get_refinement_reason(evaluation)
+                    refinement_reason=self._get_refinement_reason(evaluation),
+                    abstracts_sample=abstracts_sample
                 )
             )
             
@@ -301,63 +323,214 @@ class QueryEvaluator:
     async def _generate_refined_query(
         self,
         current_query: str,
-        evaluation: Dict[str, Any]
+        evaluation: Dict[str, Any],
+        search_result: Optional[PubMedSearchResult] = None
     ) -> str:
         """
-        Gera uma consulta refinada com base na avaliação atual
-        Este método seria idealmente implementado com LLM para refinamento inteligente,
-        mas nesta versão, usamos regras simples.
+        Gera uma consulta refinada com base na avaliação da consulta atual
         
         Args:
             current_query: Consulta atual
-            evaluation: Métricas de avaliação da consulta atual
+            evaluation: Avaliação da consulta atual
+            search_result: Resultado da busca (opcional)
             
         Returns:
             str: Consulta refinada
         """
-        # Em uma implementação completa, este método chamaria o QueryGenerator
-        # para gerar uma consulta refinada usando LLM
-        # Por agora, simularemos algumas regras simples de refinamento
+        issues = evaluation.get("issues", "")
+        total_count = evaluation.get("total_count", 0)
         
-        # Obtém o número de resultados atual
-        count = evaluation.get("total_count", 0)
+        # Recupera abstracts dos artigos encontrados para análise e refinamento agêntico
+        abstracts_data = []
+        if search_result and search_result.ids:
+            try:
+                # Obtém abstracts de até 10 artigos aleatórios da consulta atual
+                abstracts_data = await self.pubmed_service.get_article_abstracts(search_result.ids, sample_size=10)
+                logger.info(f"Obtidos {len(abstracts_data)} abstracts para análise agêntica")
+            except Exception as e:
+                logger.error(f"Erro ao obter abstracts: {str(e)}")
         
-        refined_query = current_query
-        
-        # Se a consulta for muito específica (poucos resultados)
-        if count < 100:
-            # Simplificamos a consulta removendo alguns qualificadores [tiab]
-            refined_query = refined_query.replace("[tiab]", "", 1)
+        # Consulta muito específica (poucos resultados)
+        if "muito específica" in issues or "poucos resultados" in issues:
+            # Tenta generalizar a consulta
+            logger.info("Refinando consulta muito específica para aumentar resultados")
             
-            # Adicionamos alternativas com OR para termos existentes
-            # (Simplificação - em um sistema real, usaríamos LLM para esta tarefa)
-            if "[tiab]" in refined_query and " OR " not in refined_query:
-                sample_alternatives = {
-                    "diabetes tipo 2": "DM2",
-                    "hipertensão": "pressão alta",
-                    "randomized": "randomised",
-                    "trial": "clinical trial",
-                    "metformina": "biguanida"
-                }
+            # Se temos abstracts, usa-os para identificar termos adicionais relevantes
+            if abstracts_data:
+                common_terms = self._extract_relevant_terms_from_abstracts(abstracts_data)
+                logger.info(f"Termos relevantes extraídos dos abstracts: {common_terms}")
                 
-                for term, alternative in sample_alternatives.items():
-                    if term in refined_query and alternative not in refined_query:
-                        refined_query = refined_query.replace(
-                            f"{term}[tiab]",
-                            f"({term}[tiab] OR {alternative}[tiab])"
-                        )
-                        break
+                # Adiciona termos alternativos/sinônimos à consulta
+                parts = current_query.split(" AND ")
+                refined_parts = []
+                
+                for part in parts:
+                    # Se for uma parte fechada com parênteses, mantém a estrutura
+                    if part.startswith("(") and part.endswith(")"):
+                        term_part = part[1:-1]  # Remove os parênteses
+                        terms = term_part.split(" OR ")
+                        
+                        # Adiciona novos termos relacionados dos abstracts
+                        for term in common_terms[:3]:  # Limita a 3 termos novos
+                            if term not in term_part:
+                                terms.append(f'"{term}"[tiab]')
+                        
+                        refined_parts.append("(" + " OR ".join(terms) + ")")
+                    else:
+                        refined_parts.append(part)
+                
+                return " AND ".join(refined_parts)
+            else:
+                # Método básico: substitui os operadores mais restritivos
+                return current_query.replace("[MeSH Terms]", "[MeSH Terms:noexp]").replace("[tiab]", "[All Fields]")
         
-        # Se a consulta for muito ampla (muitos resultados)
-        elif count > 500:
-            # Tornamos a consulta mais específica adicionando mais termos [tiab]
-            if "[tiab]" in refined_query and refined_query.count("AND") < 3:
-                refined_query += " AND (randomized[tiab] OR trial[tiab])"
+        # Consulta muito ampla (muitos resultados)
+        elif "muito ampla" in issues or "restringir" in issues:
+            logger.info("Refinando consulta muito ampla para reduzir resultados")
             
-            # Ou adicionamos filtros adicionais
-            # (Simplificação - em um sistema real, usaríamos LLM para esta tarefa)
-            elif refined_query.count("AND") >= 3 and "AND human[filter]" not in refined_query:
-                refined_query += " AND human[filter]"
+            # Se temos abstracts, usa-os para adicionar termos mais específicos
+            if abstracts_data:
+                specific_terms = self._extract_specific_terms_from_abstracts(abstracts_data)
+                logger.info(f"Termos específicos extraídos: {specific_terms}")
+                
+                # Adiciona uma nova parte à consulta com termos específicos
+                if specific_terms:
+                    specific_filter = " OR ".join([f'"{term}"[tiab]' for term in specific_terms[:3]])
+                    return f"{current_query} AND ({specific_filter})"
+            
+            # Método básico de restrição
+            if total_count > 1000:
+                return current_query.replace("[All Fields]", "[tiab]") + ' AND ("randomized"[tiab] OR "controlled"[tiab])'
+            else:
+                return current_query + ' AND "human"[Filter]'
         
-        # Retornamos a consulta refinada (ou a original se não houve alterações)
-        return refined_query
+        # Baixa proporção de estudos primários
+        elif "Baixa proporção de estudos primários" in issues:
+            logger.info("Refinando para aumentar proporção de estudos primários")
+            
+            # Se temos abstracts, verifica quais termos aparecem em abstracts de estudos primários
+            if abstracts_data:
+                study_terms = ["trial", "randomized", "controlled", "cohort", "prospective", "retrospective"]
+                return f"{current_query} AND ({' OR '.join([f'\"{term}\"[tiab]' for term in study_terms])})"
+            else:
+                return f"{current_query} AND (randomized[tiab] OR trial[tiab])"
+        
+        # Poucos estudos relevantes
+        elif "Poucos estudos relevantes" in issues:
+            logger.info("Refinando para aumentar relevância dos resultados")
+            
+            # Se temos abstracts, usa-os para identificar termos que aumentam a relevância
+            if abstracts_data:
+                relevance_terms = self._extract_relevant_terms_from_abstracts(abstracts_data)
+                if relevance_terms:
+                    refined_query = current_query
+                    for term in relevance_terms[:2]:  # Limita a 2 termos
+                        if term not in current_query:
+                            refined_query += f' AND "{term}"[tiab]'
+                    return refined_query
+            
+            # Método básico
+            if "systematic" not in current_query:
+                return current_query.replace("]", "] AND (\"effect\"[tiab] OR \"outcome\"[tiab])")
+            else:
+                return current_query
+        
+        # Se nenhuma condição específica for atendida, retorna a consulta original
+        logger.info("Nenhuma condição de refinamento específica atendida, mantendo consulta")
+        return current_query
+    
+    def _extract_relevant_terms_from_abstracts(self, abstracts_data: List[Dict[str, str]]) -> List[str]:
+        """
+        Extrai termos relevantes dos abstracts para expandir consultas
+        
+        Args:
+            abstracts_data: Lista de dicionários com abstracts
+            
+        Returns:
+            List[str]: Lista de termos relevantes
+        """
+        # Implementação básica - em produção, seria ideal usar NLP ou LLMs
+        terms = []
+        
+        # Palavras a ignorar (stopwords e termos genéricos)
+        stopwords = ["the", "and", "or", "in", "of", "to", "a", "an", "with", "for", 
+                     "on", "at", "from", "by", "about", "as", "is", "was", "were", 
+                     "be", "been", "being", "have", "has", "had", "do", "does", "did",
+                     "but", "if", "because", "as", "until", "while", "however", "therefore"]
+        
+        # Conta ocorrências de termos nos abstracts
+        term_count = {}
+        
+        for article in abstracts_data:
+            if "abstract" in article and article["abstract"]:
+                # Tokenização simples por espaços e pontuação
+                abstract_text = article["abstract"].lower()
+                words = abstract_text.replace(".", " ").replace(",", " ").replace(";", " ").replace(":", " ").split()
+                
+                # Remove stopwords e conta os termos
+                for word in words:
+                    word = word.strip()
+                    if word and len(word) > 3 and word not in stopwords:
+                        term_count[word] = term_count.get(word, 0) + 1
+        
+        # Retorna os termos mais frequentes
+        sorted_terms = sorted(term_count.items(), key=lambda x: x[1], reverse=True)
+        return [term for term, count in sorted_terms[:10] if count > 1]  # Retorna até 10 termos com ocorrência > 1
+    
+    def _extract_specific_terms_from_abstracts(self, abstracts_data: List[Dict[str, str]]) -> List[str]:
+        """
+        Extrai termos específicos dos abstracts para restringir consultas
+        
+        Args:
+            abstracts_data: Lista de dicionários com abstracts
+            
+        Returns:
+            List[str]: Lista de termos específicos
+        """
+        # Lista de marcadores de especificidade em abstracts
+        specificity_markers = [
+            "specifically", "particular", "unique", "distinct", "special",
+            "precisely", "exactly", "exclusively", "only", "solely"
+        ]
+        
+        # Procura por termos próximos a marcadores de especificidade
+        specific_terms = []
+        
+        for article in abstracts_data:
+            if "abstract" in article and article["abstract"]:
+                abstract_text = article["abstract"].lower()
+                
+                # Verifica cada marcador de especificidade
+                for marker in specificity_markers:
+                    if marker in abstract_text:
+                        # Encontra a posição do marcador
+                        pos = abstract_text.find(marker)
+                        
+                        # Pega um trecho de 50 caracteres após o marcador
+                        context = abstract_text[pos:pos+50] if pos+50 < len(abstract_text) else abstract_text[pos:]
+                        
+                        # Extrai o primeiro substantivo após o marcador (simplificado)
+                        words = context.split()
+                        if len(words) > 1:
+                            # Adiciona a palavra após o marcador, se for longa o suficiente
+                            candidate = words[1]
+                            if len(candidate) > 3 and candidate not in specific_terms:
+                                specific_terms.append(candidate)
+        
+        # Se não encontrou termos específicos pelos marcadores, usa os termos mais longos
+        if not specific_terms:
+            all_words = []
+            for article in abstracts_data:
+                if "abstract" in article and article["abstract"]:
+                    words = article["abstract"].lower().split()
+                    all_words.extend([word for word in words if len(word) > 6])  # Palavras longas tendem a ser mais específicas
+            
+            # Conta frequência
+            word_count = {}
+            for word in all_words:
+                word_count[word] = word_count.get(word, 0) + 1
+                
+            # Seleciona termos específicos menos comuns
+            specific_terms = [word for word, count in word_count.items() if count == 1][:5]
+        
+        return specific_terms

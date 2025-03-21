@@ -4,6 +4,7 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple, Any
 from urllib.parse import quote_plus
+import random
 
 import httpx
 from fastapi import HTTPException
@@ -222,3 +223,94 @@ class PubMedService:
             logger.error(f"Erro ao realizar web scraping: {str(e)}")
             raise HTTPException(status_code=500, 
                                detail=f"Erro ao realizar web scraping do PubMed: {str(e)}")
+    
+    async def get_article_abstracts(self, pmids: List[str], sample_size: int = 10) -> List[Dict[str, str]]:
+        """
+        Obtém abstracts de artigos a partir de seus PMIDs
+        
+        Args:
+            pmids: Lista de PMIDs dos artigos
+            sample_size: Número de artigos para amostrar (se houver mais que sample_size PMIDs)
+            
+        Returns:
+            List[Dict[str, str]]: Lista de dicionários com PMID, título e abstract
+        """
+        if not pmids:
+            return []
+        
+        # Se houver mais PMIDs que o tamanho da amostra, seleciona aleatoriamente
+        if len(pmids) > sample_size:
+            selected_pmids = random.sample(pmids, sample_size)
+        else:
+            selected_pmids = pmids
+            
+        logger.info(f"Obtendo abstracts para {len(selected_pmids)} artigos")
+        
+        try:
+            # Parâmetros para a requisição de fetch
+            fetch_params = {
+                **self.common_params,
+                "id": ",".join(selected_pmids),
+                "retmode": "xml",
+                "rettype": "abstract"
+            }
+            
+            # Faz a requisição para o endpoint de fetch
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(self.efetch_url, params=fetch_params)
+                response.raise_for_status()
+            
+            # Processa o XML da resposta
+            root = ET.fromstring(response.text)
+            
+            abstracts = []
+            
+            # Processa cada artigo no XML
+            for article in root.findall(".//PubmedArticle"):
+                pmid_elem = article.find(".//PMID")
+                pmid = pmid_elem.text if pmid_elem is not None else "Unknown"
+                
+                # Busca o título
+                title_elem = article.find(".//ArticleTitle")
+                title = title_elem.text if title_elem is not None else "No title available"
+                
+                # Busca o abstract - pode estar em vários formatos
+                abstract_text = ""
+                
+                # Primeiro tenta encontrar abstract na forma de AbstractText
+                abstract_elems = article.findall(".//Abstract/AbstractText")
+                if abstract_elems:
+                    for abstract_elem in abstract_elems:
+                        # Verifica se tem Label (seções do abstract)
+                        label = abstract_elem.get("Label", "")
+                        if label:
+                            abstract_text += f"{label}: {abstract_elem.text}\n"
+                        else:
+                            abstract_text += f"{abstract_elem.text}\n"
+                else:
+                    # Tenta outros formatos comuns
+                    other_abstract = article.find(".//Abstract//text")
+                    if other_abstract is not None and other_abstract.text:
+                        abstract_text = other_abstract.text
+                
+                # Se não encontrou abstract
+                if not abstract_text:
+                    abstract_text = "Abstract not available"
+                
+                abstracts.append({
+                    "pmid": pmid,
+                    "title": title,
+                    "abstract": abstract_text.strip()
+                })
+            
+            return abstracts
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro HTTP ao buscar abstracts no PubMed: {str(e)}")
+            return []
+        except httpx.RequestError as e:
+            logger.error(f"Erro de conexão ao buscar abstracts na API do PubMed: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"Erro ao processar abstracts do PubMed: {str(e)}")
+            return []

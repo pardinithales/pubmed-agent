@@ -10,6 +10,10 @@ class PICOTTQuery(BaseModel):
         ..., 
         description="Texto descritivo da pergunta clínica no formato PICOTT (População, Intervenção, Comparação, Outcome, Tipo de estudo, Tempo)"
     )
+    max_iterations: int = Field(
+        default=3,
+        description="Número máximo de iterações para o refinamento da consulta"
+    )
 
 
 class QueryIteration(BaseModel):
@@ -26,6 +30,10 @@ class QueryIteration(BaseModel):
     refinement_reason: Optional[str] = Field(
         None, 
         description="Razão para o refinamento da consulta na próxima iteração"
+    )
+    abstracts_sample: Optional[List[Dict[str, str]]] = Field(
+        None,
+        description="Amostra de abstracts analisados nesta iteração"
     )
 
 
