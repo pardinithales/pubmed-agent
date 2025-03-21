@@ -296,7 +296,7 @@ if submit_button and picott_text:
                 st.markdown(f"**Número de resultados estimados:** {result_count} artigos")
             
             # Mostrar detalhes das iterações
-            if st.checkbox("Ver detalhes das iterações"):
+            if st.checkbox("Ver detalhes das iterações", value=True):
                 for i, iteration in enumerate(result.get("iterations", [])):
                     with st.expander(f"Iteração {i+1}"):
                         st.code(iteration.get("query", ""), language="text")
