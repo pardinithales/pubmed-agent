@@ -148,14 +148,16 @@ def main():
         print("❌ Não foi possível continuar devido a dependências faltantes.")
         return
     
-    # Se estiver rodando no Streamlit Cloud, sempre usar o app simplificado
+    # Comentário sobre modificação:
+    # Modificado para usar o aplicativo principal mesmo no Streamlit Cloud
+    # Se estiver rodando no Streamlit Cloud, usar o aplicativo principal
     if is_running_on_streamlit_cloud():
-        print("Detectado ambiente Streamlit Cloud, usando modo simplificado...")
+        print("Detectado ambiente Streamlit Cloud, usando aplicativo principal...")
         
-        # Caminho para o aplicativo simplificado
-        simple_app_path = os.path.join(root_dir, "simple_streamlit_app.py")
+        # Caminho para o aplicativo principal
+        streamlit_app_path = os.path.join(root_dir, "streamlit_app.py")
         
-        if os.path.exists(simple_app_path):
+        if os.path.exists(streamlit_app_path):
             try:
                 # Configurar variáveis de ambiente para otimizar desempenho
                 os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
@@ -163,22 +165,47 @@ def main():
                 os.environ["STREAMLIT_SERVER_MAX_UPLOAD_SIZE"] = "5"  # Limitar tamanho de upload
                 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Desativar estatísticas
                 os.environ["STREAMLIT_THEME_BASE"] = "light"  # Tema mais leve
-                os.environ["FORCE_SIMPLE_APP"] = "true"  # Flag para forçar app simples
-                os.environ["API_OFFLINE_MODE"] = "true"  # Flag para indicar que API não está disponível
+                os.environ["FORCE_SIMPLE_APP"] = "false"  # Permitir uso do app principal
+                os.environ["API_OFFLINE_MODE"] = "false"  # Permitir uso da API
                 
-                print("Iniciando aplicativo simplificado em modo cloud...")
+                print("Iniciando aplicativo principal em modo cloud...")
                 import streamlit.web.cli as streamlit_cli
-                sys.argv = ["streamlit", "run", simple_app_path]
+                sys.argv = ["streamlit", "run", streamlit_app_path]
                 streamlit_cli.main()
                 
             except Exception as e:
                 print(f"Erro crítico no deploy: {str(e)}")
+                # Fallback para o app simplificado em caso de erro
+                simple_app_path = os.path.join(root_dir, "simple_streamlit_app.py")
+                if os.path.exists(simple_app_path):
+                    print("Tentando carregar o aplicativo simplificado como fallback...")
+                    try:
+                        os.environ["FORCE_SIMPLE_APP"] = "true"
+                        sys.argv = ["streamlit", "run", simple_app_path]
+                        streamlit_cli.main()
+                        return
+                    except Exception as e2:
+                        print(f"Erro no fallback: {str(e2)}")
+                
                 # Último recurso: iniciar uma página estática de erro
                 with open(os.path.join(root_dir, "error.html"), "w") as f:
                     f.write("<html><body><h1>Erro no Aplicativo</h1><p>Houve um problema ao iniciar o aplicativo.</p></body></html>")
         else:
-            print("ERRO: Aplicativo simplificado não encontrado!")
-            # Criar um arquivo simples caso o simple_app não exista
+            print("ERRO: Aplicativo principal não encontrado!")
+            
+            # Tentar usar o aplicativo simplificado como fallback
+            simple_app_path = os.path.join(root_dir, "simple_streamlit_app.py")
+            if os.path.exists(simple_app_path):
+                try:
+                    os.environ["FORCE_SIMPLE_APP"] = "true"
+                    import streamlit.web.cli as streamlit_cli
+                    sys.argv = ["streamlit", "run", simple_app_path]
+                    streamlit_cli.main()
+                    return
+                except Exception as e:
+                    print(f"Erro no fallback: {str(e)}")
+            
+            # Criar um arquivo de emergência se nada funcionar
             with open(os.path.join(root_dir, "emergency_app.py"), "w") as f:
                 f.write("""
 import streamlit as st
