@@ -11,8 +11,8 @@ os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
 os.environ["STREAMLIT_SERVER_MAX_UPLOAD_SIZE"] = "5"  # Limitar tamanho de upload
 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Desativar estatísticas
 os.environ["STREAMLIT_THEME_BASE"] = "light"  # Tema mais leve
-os.environ["FORCE_SIMPLE_APP"] = "true"  # Flag para forçar app simples
-os.environ["API_OFFLINE_MODE"] = "true"  # Flag para indicar que API não está disponível
+os.environ["FORCE_SIMPLE_APP"] = "false"  # Permitir uso da aplicação principal
+os.environ["API_OFFLINE_MODE"] = "false"  # Permitir uso da API
 
 # Configurar formato dos logs do Streamlit
 os.environ["STREAMLIT_LOG_LEVEL"] = "info"
