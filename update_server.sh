@@ -1,3 +1,20 @@
+#!/bin/bash
+
+# Script para atualizar o serviço PubMed API no servidor Ubuntu
+echo "Atualizando o código do PubMed Search API..."
+
+# Navegar para o diretório do projeto
+cd /root/pubmed_search
+
+# Atualizar o código do repositório git (opcional, caso esteja usando git)
+# git pull origin main
+
+# Backup do arquivo de rotas atual
+cp app/api/routes.py app/api/routes.py.bak
+echo "Backup criado: app/api/routes.py.bak"
+
+# Atualizar o arquivo de rotas para usar max_iterations do usuário
+cat > app/api/routes.py << 'EOL'
 from fastapi import APIRouter, HTTPException, Depends, status
 from app.models.schemas import PICOTTQuery, PubMedSearchResponse
 from app.services.pubmed_service import PubMedService
@@ -47,3 +64,38 @@ async def search_pubmed(query: PICOTTQuery):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao processar a consulta: {str(e)}"
         )
+EOL
+echo "Arquivo app/api/routes.py atualizado."
+
+# Atualizar o arquivo de serviço do systemd
+cat > /etc/systemd/system/pubmed_api.service << 'EOL'
+[Unit]
+Description=PubMed Search API Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/pubmed_search
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=10
+Environment=PYTHONPATH=/root/pubmed_search
+Environment=APP_ENV=production
+Environment=MAX_ITERATIONS=5
+
+[Install]
+WantedBy=multi-user.target
+EOL
+echo "Arquivo de serviço systemd atualizado."
+
+# Recarregar configuração do systemd
+systemctl daemon-reload
+echo "Configuração do systemd recarregada."
+
+# Reiniciar o serviço
+systemctl restart pubmed_api
+echo "Serviço pubmed_api reiniciado."
+
+# Verificar status do serviço
+systemctl status pubmed_api
+echo "Atualização concluída!" 

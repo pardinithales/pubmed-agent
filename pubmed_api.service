@@ -1,0 +1,16 @@
+[Unit]
+Description=PubMed Search API Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/pubmed_search
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=10
+Environment=PYTHONPATH=/root/pubmed_search
+Environment=APP_ENV=production
+Environment=MAX_ITERATIONS=5
+
+[Install]
+WantedBy=multi-user.target 

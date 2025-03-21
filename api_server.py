@@ -86,18 +86,21 @@ async def search(query: PicottQuery):
         ("{intervention_terms[0] if intervention_terms else 'treatment'}"[tiab] OR "{intervention_terms[1] if len(intervention_terms) > 1 else intervention_terms[0] if intervention_terms else 'therapy'}"[tiab]))
         """.strip()
         
+        # Criar lista de iterações baseada no max_iterations fornecido
+        iterations = []
+        for i in range(1, min(query.max_iterations + 1, 2)):  # Limita a 1 iteração na versão simplificada
+            iterations.append({
+                "iteration_number": i,
+                "query": pubmed_query,
+                "result_count": 42,  # Valor simulado
+                "refinement_reason": "Consulta inicial gerada a partir do texto PICOTT"
+            })
+        
         # Resposta final
         response = {
             "original_query": query.picott_text,
             "best_pubmed_query": pubmed_query,
-            "iterations": [
-                {
-                    "iteration_number": 1,
-                    "query": pubmed_query,
-                    "result_count": 42,  # Valor simulado
-                    "refinement_reason": "Consulta inicial gerada a partir do texto PICOTT"
-                }
-            ],
+            "iterations": iterations,
             "deployment_note": "Versão serverless otimizada para o Vercel. Para funcionalidade completa, use a API local."
         }
         

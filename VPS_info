@@ -1,0 +1,91 @@
+# PubMed Agent - Guia de Acesso à VPS
+
+Este documento contém instruções detalhadas para acessar e gerenciar a API do PubMed Agent hospedada na VPS.
+
+## Informações de Acesso
+
+- **Endereço IP**: 5.161.199.194
+- **Porta da API**: 8080
+- **URL da API**: http://5.161.199.194:8080
+
+## Acessando a VPS
+
+1. **Via SSH**:
+   ```bash
+   ssh root@5.161.199.194
+   ```
+
+2. **Navegação até o diretório da aplicação**:
+   ```bash
+   cd /var/www/pubmed_api
+   ```
+
+## Arquivos Importantes
+
+### Configuração do Serviço
+- **/etc/systemd/system/pubmed_api.service** - Arquivo de configuração do serviço systemd que gerencia a API
+
+### Arquivos da Aplicação
+- **/var/www/pubmed_api/app/main.py** - Ponto de entrada principal da API
+- **/var/www/pubmed_api/app/api/routes.py** - Rotas da API (endpoints)
+- **/var/www/pubmed_api/app/services/pubmed_service.py** - Lógica principal do serviço
+- **/var/www/pubmed_api/app/core/config.py** - Configurações da aplicação
+- **/var/www/pubmed_api/.env** - Variáveis de ambiente (chaves API, etc.)
+
+### Scripts de Monitoramento
+- **/var/www/pubmed_api/monitor_api.sh** - Script que monitora a API e a reinicia se necessário
+
+## Comandos Úteis
+
+### Gerenciamento do Serviço
+```bash
+# Verificar status do serviço
+sudo systemctl status pubmed_api
+
+# Reiniciar o serviço
+sudo systemctl restart pubmed_api
+
+# Visualizar logs
+sudo journalctl -u pubmed_api -n 50
+```
+
+### Testar a API
+```bash
+# Verificar se a API está respondendo
+curl http://localhost:8080/
+
+# Testar uma consulta
+curl -X POST http://localhost:8080/api/search -H "Content-Type: application/json" -d '{"picott_text": "diabetes treatment", "max_iterations": 3}'
+```
+
+### Editar Configuração do Timeout
+```bash
+# Editar o arquivo de serviço para aumentar o timeout
+sudo nano /etc/systemd/system/pubmed_api.service
+
+# Após editar, recarregar e reiniciar
+sudo systemctl daemon-reload
+sudo systemctl restart pubmed_api
+```
+
+## Solução de Problemas com Iterações Múltiplas
+
+Se a API estiver realizando apenas uma iteração, mesmo quando solicitado mais:
+
+1. **Verifique os logs**:
+   ```bash
+   sudo journalctl -u pubmed_api -n 100
+   ```
+
+2. **Aumente o timeout do Gunicorn**:
+   ```bash
+   sudo nano /etc/systemd/system/pubmed_api.service
+   # Adicione --timeout 180 ao comando Gunicorn
+   sudo systemctl daemon-reload
+   sudo systemctl restart pubmed_api
+   ```
+
+3. **Verifique o arquivo routes.py** para garantir que o parâmetro max_iterations esteja sendo processado corretamente:
+   ```bash
+   sudo nano /var/www/pubmed_api/app/api/routes.py
+   ```
